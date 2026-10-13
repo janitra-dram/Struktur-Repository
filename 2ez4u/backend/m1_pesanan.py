@@ -1,3 +1,34 @@
+import csv
+
+class Pesanan:
+    def __init__(self, oid, pelanggan, resto, menu, harga=0, prioritas=3, t_masuk_detik=0, t_selesai_detik=0, status="ANTRE"):
+        self.oid = str(oid)
+        self.pelanggan = str(pelanggan)
+        self.resto = str(resto)
+        self.menu = str(menu)
+        self.harga = int(harga) if str(harga).strip() else 0
+        self.prioritas = int(prioritas) if str(prioritas).strip() else 3
+        self.t_masuk_detik = int(t_masuk_detik) if str(t_masuk_detik).strip() else 0
+        self.t_selesai_detik = int(t_selesai_detik) if str(t_selesai_detik).strip() else 0
+        self.status = str(status)
+
+    def to_list(self):
+        return [
+            self.oid,
+            self.pelanggan,
+            self.resto,
+            self.menu,
+            f"Rp{self.harga:,}",
+            self.prioritas,
+            self.t_masuk_detik,
+            self.t_selesai_detik if self.t_selesai_detik else "-",
+            self.status
+        ]
+
+    def __str__(self):
+        return f"[{self.oid}] {self.pelanggan} - {self.menu} ({self.resto}) - Rp{self.harga:,} [P{self.prioritas} - {self.status}]"
+
+
 class Array:
     def __init__(self, capacity=4):
         self.capacity = capacity
@@ -94,14 +125,15 @@ class LinkList:
             self.head = new_node
             if self.size == 0:
                 self.tail = new_node
+        elif i == self.size:
+            self.tail.next = new_node
+            self.tail = new_node
         else:
             curr = self.head
             for _ in range(i - 1):
                 curr = curr.next
             new_node.next = curr.next
             curr.next = new_node
-            if new_node.next is None:
-                self.tail = new_node
         self.size += 1
 
     def delete(self, i):
@@ -131,3 +163,31 @@ class LinkList:
 
     def tambah_vip(self, v):
         self.insert(0, v)
+
+
+def muat_data_csv(filepath):
+    arr = Array()
+    ll = LinkList()
+    with open(filepath, mode="r", encoding="utf-8") as f:
+        reader = csv.reader(f)
+        try:
+            next(reader)
+        except StopIteration:
+            return arr, ll
+        for row in reader:
+            if not row:
+                continue
+            p = Pesanan(
+                row[0],
+                row[1],
+                row[2],
+                row[3],
+                row[4] if len(row) > 4 else 0,
+                row[5] if len(row) > 5 else 3,
+                row[6] if len(row) > 6 else 0,
+                row[7] if len(row) > 7 else 0,
+                row[8] if len(row) > 8 else "ANTRE"
+            )
+            arr.append(p)
+            ll.append(p)
+    return arr, ll
