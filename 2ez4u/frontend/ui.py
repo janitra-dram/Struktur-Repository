@@ -11,6 +11,26 @@ from backend.m2_antrean import (
     AntreanNaif,
     AntreanMelingkar
 )
+from backend.m3_laporan import (
+    insertion_sort,
+    merge_sort,
+    linear_search,
+    binary_search
+)
+
+class ListWrapper:
+    def __init__(self, data):
+        self.data = data
+
+    @property
+    def size(self):
+        return len(self.data)
+
+    def get(self, i):
+        if 0 <= i < len(self.data):
+            return self.data[i]
+        return None
+
 
 class AppUI:
     def __init__(self, root):
@@ -24,11 +44,15 @@ class AppUI:
 
         self.array_data = Array()
         self.linked_list_data = LinkList()
+        self.master_list = []
 
         self.q_naif = AntreanNaif()
         self.q_circ = AntreanMelingkar(32768)
         self.tumpukan_undo = Stack()
         self.tumpukan_redo = Stack()
+
+        self.sorted_list = None
+        self.oid_sorted_list = None
 
         self.active_mode = "ARRAY - TAMBAH PESANAN REGULER"
         self.page_size = 50
@@ -74,6 +98,7 @@ class AppUI:
 
         ttk.Separator(scrollable_frame, orient="horizontal").pack(fill=tk.X, padx=10, pady=8)
 
+        # M1
         tk.Label(scrollable_frame, text="M1 - DATA PESANAN", font=("Arial", 9, "bold"), bg="#f0f0f0", anchor="w").pack(fill=tk.X, padx=10, pady=(2, 4))
         m1_menus = [
             ("ARRAY - LIHAT PESANAN", lambda: self.select_menu("ARRAY - LIHAT PESANAN")),
@@ -97,6 +122,7 @@ class AppUI:
 
         ttk.Separator(scrollable_frame, orient="horizontal").pack(fill=tk.X, padx=10, pady=8)
 
+        # M2
         tk.Label(scrollable_frame, text="M2 - ANTREAN DAN UNDO", font=("Arial", 9, "bold"), bg="#f0f0f0", anchor="w").pack(fill=tk.X, padx=10, pady=(2, 4))
         m2_menus = [
             ("STACK - POSTFIX (MESIN KASIR)", lambda: self.select_menu("STACK - POSTFIX (MESIN KASIR)")),
@@ -115,8 +141,25 @@ class AppUI:
 
         ttk.Separator(scrollable_frame, orient="horizontal").pack(fill=tk.X, padx=10, pady=8)
 
+        # M3
+        tk.Label(scrollable_frame, text="M3 - SORT & SEARCH", font=("Arial", 9, "bold"), bg="#f0f0f0", anchor="w").pack(fill=tk.X, padx=10, pady=(2, 4))
+        m3_menus = [
+            ("SORT - INSERTION SORT", lambda: self.select_menu("SORT - INSERTION SORT")),
+            ("SORT - MERGE SORT", lambda: self.select_menu("SORT - MERGE SORT")),
+            ("SEARCH - LINEAR SEARCH", lambda: self.select_menu("SEARCH - LINEAR SEARCH")),
+            ("SEARCH - BINARY SEARCH", lambda: self.select_menu("SEARCH - BINARY SEARCH")),
+        ]
+
+        for text, cmd in m3_menus:
+            btn = tk.Button(scrollable_frame, text=text, font=("Arial", 8), bg="#ffffff",
+                            relief=tk.RAISED, anchor="w", padx=6, pady=2, command=cmd, cursor="hand2")
+            btn.pack(fill=tk.X, padx=10, pady=2)
+            self.sidebar_buttons[text] = btn
+
+        ttk.Separator(scrollable_frame, orient="horizontal").pack(fill=tk.X, padx=10, pady=8)
+
         placeholders = [
-            ("M3 DAN M4 - LAPORAN & SEARCH", ["Laporan harian", "Cari di laporan", "Bangun indeks hash", "Cari pesanan (oid)"]),
+            ("M4 - PENCARIAN HASH", ["Bangun indeks hash", "Cari pesanan (hash)"]),
             ("M5 - KATALOG & PRIORITAS", ["Menu per rentang harga", "Isi antrean prioritas"]),
             ("M6 - PETA DAN RUTE", ["Muat peta", "Cari rute terpendek"])
         ]
@@ -265,6 +308,57 @@ class AppUI:
                                     font=("Arial", 9, "bold"), command=self.execute_redo, cursor="hand2")
             btn_execute.grid(row=0, column=1, padx=15, pady=4)
 
+        elif mode in ("SORT - INSERTION SORT", "SORT - MERGE SORT"):
+            tk.Label(self.form_frame, text="Kunci Pengurutan:", font=("Arial", 9, "bold"), bg="#ffffff").grid(row=0, column=0, sticky="w", padx=5, pady=3)
+            self.combo_sort_key = ttk.Combobox(self.form_frame, values=["harga", "oid", "t_selesai_detik", "t_masuk_detik"], width=15, state="readonly")
+            self.combo_sort_key.set("harga")
+            self.combo_sort_key.grid(row=0, column=1, padx=5, pady=3)
+
+            tk.Label(self.form_frame, text="Jumlah Baris (n):", font=("Arial", 9, "bold"), bg="#ffffff").grid(row=0, column=2, sticky="w", padx=10, pady=3)
+            self.entry_sort_n = tk.Entry(self.form_frame, width=12)
+            self.entry_sort_n.insert(0, "2000")
+            self.entry_sort_n.grid(row=0, column=3, padx=5, pady=3)
+
+            is_ins = mode == "SORT - INSERTION SORT"
+            btn_txt = "URUTKAN (INSERTION)" if is_ins else "URUTKAN (MERGE)"
+            btn_col = "#d9534f" if is_ins else "#007acc"
+            btn_cmd = self.execute_insertion_sort if is_ins else self.execute_merge_sort
+
+            btn_execute = tk.Button(self.form_frame, text=btn_txt, bg=btn_col, fg="#ffffff",
+                                    font=("Arial", 9, "bold"), command=btn_cmd, cursor="hand2")
+            btn_execute.grid(row=0, column=4, padx=15, pady=3)
+
+            # Shortcut tombol n
+            shortcuts_frame = tk.Frame(self.form_frame, bg="#ffffff")
+            shortcuts_frame.grid(row=1, column=0, columnspan=5, sticky="w", padx=5, pady=(4, 0))
+            tk.Label(shortcuts_frame, text="Preset n:", font=("Arial", 8), bg="#ffffff").pack(side=tk.LEFT, padx=(0, 5))
+            for val_n in ("10", "2000", "4000", "200000"):
+                b = tk.Button(shortcuts_frame, text=f"n={val_n}", font=("Arial", 8), bg="#f0f0f0",
+                              command=lambda v=val_n: self.set_sort_n(v))
+                b.pack(side=tk.LEFT, padx=2)
+
+        elif mode in ("SEARCH - LINEAR SEARCH", "SEARCH - BINARY SEARCH"):
+            tk.Label(self.form_frame, text="Target OID:", font=("Arial", 9, "bold"), bg="#ffffff").grid(row=0, column=0, sticky="w", padx=5, pady=4)
+            self.entry_search_target = tk.Entry(self.form_frame, width=20)
+            self.entry_search_target.insert(0, "O-137442")
+            self.entry_search_target.grid(row=0, column=1, padx=5, pady=4)
+
+            is_lin = mode == "SEARCH - LINEAR SEARCH"
+            btn_txt = "CARI (LINEAR)" if is_lin else "CARI (BINARY)"
+            btn_col = "#ff9900" if is_lin else "#28a745"
+            btn_cmd = self.execute_linear_search if is_lin else self.execute_binary_search
+
+            btn_execute = tk.Button(self.form_frame, text=btn_txt, bg=btn_col, fg="#ffffff",
+                                    font=("Arial", 9, "bold"), command=btn_cmd, cursor="hand2")
+            btn_execute.grid(row=0, column=2, padx=15, pady=4)
+
+            presets_frame = tk.Frame(self.form_frame, bg="#ffffff")
+            presets_frame.grid(row=0, column=3, sticky="w", padx=5)
+            for oid_sample in ("O-000002", "O-137442", "O-199999"):
+                b = tk.Button(presets_frame, text=oid_sample, font=("Arial", 8), bg="#f0f0f0",
+                              command=lambda o=oid_sample: self.set_search_target(o))
+                b.pack(side=tk.LEFT, padx=2)
+
         elif "LIHAT PESANAN" in mode:
             lbl = tk.Label(self.form_frame, text="Nomor Indeks Pesanan (i):", font=("Arial", 9, "bold"), bg="#ffffff")
             lbl.grid(row=0, column=0, sticky="w", padx=5, pady=4)
@@ -322,6 +416,14 @@ class AppUI:
                                     width=12, command=btn_cmd, cursor="hand2")
             btn_execute.grid(row=0, column=4, rowspan=2, padx=20, pady=3)
 
+    def set_sort_n(self, n_str):
+        self.entry_sort_n.delete(0, tk.END)
+        self.entry_sort_n.insert(0, n_str)
+
+    def set_search_target(self, target_str):
+        self.entry_search_target.delete(0, tk.END)
+        self.entry_search_target.insert(0, target_str)
+
     def select_menu(self, menu_name):
         self.active_mode = menu_name
 
@@ -347,7 +449,11 @@ class AppUI:
             "QUEUE - DEQUEUE NAIF": ("Queue Naif: Layani Pesanan", "Mengambil pesanan depan dengan menggeser seluruh sisa elemen: O(n)"),
             "QUEUE - DEQUEUE CIRCULAR": ("Queue Melingkar: Layani Pesanan", "Mengambil pesanan depan dengan memajukan pointer front: O(1) tanpa penggeseran"),
             "STACK - UNDO": ("Stack Undo: Batalkan Aksi Antrean", "Membatalkan aksi enqueue/dequeue terakhir dan mengembalikan status antrean"),
-            "STACK - REDO": ("Stack Redo: Ulangi Aksi yang Dibatalkan", "Mengerjakan ulang aksi yang baru saja dibatalkan")
+            "STACK - REDO": ("Stack Redo: Ulangi Aksi yang Dibatalkan", "Mengerjakan ulang aksi yang baru saja dibatalkan"),
+            "SORT - INSERTION SORT": ("Sort: Insertion Sort (Stabil, In-Place)", "Pengurutan O(n^2) dengan membandingkan dan menggeser elemen ke kiri. Batas 20.000 baris."),
+            "SORT - MERGE SORT": ("Sort: Merge Sort (Stabil, Divide & Conquer)", "Pengurutan O(n log n) yang mampu menangani seluruh 200.000 data sekaligus."),
+            "SEARCH - LINEAR SEARCH": ("Search: Linear Search", "Pencarian O(n) satu per satu tanpa menuntut data terurut."),
+            "SEARCH - BINARY SEARCH": ("Search: Binary Search", "Pencarian O(log n) pada data yang sudah terurut menurut OID.")
         }
 
         title, sub = descriptions.get(menu_name, (menu_name, ""))
@@ -362,6 +468,15 @@ class AppUI:
         elif menu_name == "STACK - POSTFIX (MESIN KASIR)":
             self.current_view_mode = "POSTFIX"
             self.setup_table_columns_postfix()
+        elif menu_name.startswith("SORT"):
+            self.current_view_mode = "SORTED" if self.sorted_list else "M1"
+            self.setup_table_columns_orders()
+            self.current_page = 0
+            self.render_table()
+        elif menu_name.startswith("SEARCH"):
+            self.current_view_mode = "SORTED" if (menu_name == "SEARCH - BINARY SEARCH" and self.oid_sorted_list) else "M1"
+            self.setup_table_columns_orders()
+            self.render_table()
         else:
             self.current_view_mode = "M1"
             self.setup_table_columns_orders()
@@ -432,6 +547,7 @@ class AppUI:
             ll = LinkList()
             qn = AntreanNaif()
             qc = AntreanMelingkar(32768)
+            ml = []
 
             with open(self.csv_path, mode="r", encoding="utf-8") as f:
                 reader = csv.reader(f)
@@ -455,16 +571,20 @@ class AppUI:
                     )
                     arr.append(p)
                     ll.append(p)
+                    ml.append(p)
                     if p.status == "ANTRE":
                         qn.enqueue(p)
                         qc.enqueue(p)
 
             self.array_data = arr
             self.linked_list_data = ll
+            self.master_list = ml
             self.q_naif = qn
             self.q_circ = qc
             self.tumpukan_undo.clear()
             self.tumpukan_redo.clear()
+            self.sorted_list = None
+            self.oid_sorted_list = None
 
             duration_ms = (time.perf_counter() - t0) * 1000
 
@@ -483,6 +603,8 @@ class AppUI:
     def get_active_data_source(self):
         if self.current_view_mode == "QUEUE":
             return self.q_circ
+        if self.current_view_mode == "SORTED" and self.sorted_list:
+            return self.sorted_list
         return self.array_data
 
     def render_table(self):
@@ -496,7 +618,7 @@ class AppUI:
         total = source.size
 
         if total == 0:
-            self.lbl_status_data.config(text="Antrean Kosong (0 Pesanan)", fg="red")
+            self.lbl_status_data.config(text="Data Kosong (0 Pesanan)", fg="red")
             self.lbl_page_info.config(text="Hal 0 / 0")
             return
 
@@ -514,7 +636,13 @@ class AppUI:
             if pesanan is not None:
                 self.tree.insert("", tk.END, iid=str(i), values=pesanan.to_list())
 
-        tag = "Antrean ANTRE" if self.current_view_mode == "QUEUE" else "Data Master"
+        if self.current_view_mode == "QUEUE":
+            tag = "Antrean ANTRE"
+        elif self.current_view_mode == "SORTED":
+            tag = "Hasil Terurut"
+        else:
+            tag = "Data Master"
+
         self.lbl_status_data.config(
             text=f"[{tag}] Total: {total:,} | Menampilkan {start_idx:,} - {end_idx - 1:,}",
             fg="#111827"
@@ -612,6 +740,7 @@ class AppUI:
             self.linked_list_data.tambah_vip(p_ll)
             t_ll_ms = (time.perf_counter() - t0) * 1000
 
+            self.master_list.insert(0, p_arr)
             op_name = "tambah_vip"
             target_idx = 0
         elif is_prioritas:
@@ -623,8 +752,9 @@ class AppUI:
             self.linked_list_data.tambah_prioritas(p_ll)
             t_ll_ms = (time.perf_counter() - t0) * 1000
 
-            op_name = "tambah_prioritas"
             target_idx = (self.array_data.size - 1) // 2
+            self.master_list.insert(target_idx, p_arr)
+            op_name = "tambah_prioritas"
         else:
             t0 = time.perf_counter()
             self.array_data.tambah_reguler(p_arr)
@@ -634,9 +764,11 @@ class AppUI:
             self.linked_list_data.tambah_reguler(p_ll)
             t_ll_ms = (time.perf_counter() - t0) * 1000
 
+            self.master_list.append(p_arr)
             op_name = "tambah_reguler"
             target_idx = self.array_data.size - 1
 
+        self.oid_sorted_list = None
         self.jump_to_index(target_idx)
         self.lbl_detail_selection.config(
             text=f"Berhasil ditambahkan di indeks [{target_idx:,}]: {p_arr.oid} - {p_arr.pelanggan} ({p_arr.menu})"
@@ -668,6 +800,10 @@ class AppUI:
         del_ll = self.linked_list_data.delete(idx)
         t_ll_ms = (time.perf_counter() - t0) * 1000
 
+        if 0 <= idx < len(self.master_list):
+            self.master_list.pop(idx)
+        self.oid_sorted_list = None
+
         self.jump_to_index(max(0, min(idx, self.array_data.size - 1)))
         self.lbl_detail_selection.config(
             text=f"Pesanan di indeks [{idx:,}] berhasil dihapus: {del_arr.oid} - {del_arr.pelanggan}"
@@ -678,7 +814,7 @@ class AppUI:
         self.log_command(f"  Array.delete({idx:,})    : {t_arr_ms:.4f} ms")
         self.log_command(f"  LinkList.delete({idx:,}) : {t_ll_ms:.4f} ms")
 
-    # Operasi M2: Postfix Kasir
+    # Operasi M2
     def execute_postfix(self):
         expr = self.entry_expr.get().strip()
         if not expr:
@@ -711,7 +847,6 @@ class AppUI:
         self.log_command(f"  postfix: {postfix_str}")
         self.log_command(f"  TOTAL : Rp {total:,} [M2 - stack] {duration_ms:.2f} ms")
 
-    # Operasi M2: Queue & Undo/Redo
     def execute_queue_enqueue(self):
         pelanggan = self.entry_pelanggan.get().strip()
         resto = self.entry_resto.get().strip()
@@ -897,6 +1032,117 @@ class AppUI:
             self.log_command(f"  tumpukan undo {self.tumpukan_undo.size}, redo {self.tumpukan_redo.size}")
 
         self.build_form_inputs()
+
+    # Operasi M3: Sort & Search
+    def execute_insertion_sort(self):
+        n_str = self.entry_sort_n.get().strip()
+        if not n_str.isdigit() or int(n_str) <= 0:
+            messagebox.showwarning("Peringatan", "Masukkan jumlah baris n yang valid!")
+            return
+
+        n = int(n_str)
+        key = self.combo_sort_key.get()
+
+        data_to_sort = self.master_list[:n]
+        res, comps, shifts, dur_ms, err = insertion_sort(data_to_sort, key)
+
+        if err:
+            self.log_command(f"> insertion_sort jumlah={n}")
+            self.log_command(f"  {err}")
+            messagebox.showwarning("Ditolak", err)
+            return
+
+        self.sorted_list = ListWrapper(res)
+        self.current_view_mode = "SORTED"
+        self.current_page = 0
+        self.render_table()
+
+        self.lbl_detail_selection.config(
+            text=f"Insertion Sort: {n:,} pesanan terurut menurut '{key}' | {comps:,} perbandingan | {shifts:,} pemindahan | {dur_ms:.2f} ms"
+        )
+        self.log_command(f"> insertion_sort jumlah={n:,} kunci={key}")
+        self.log_command(f"  {n:,} pesanan terurut | {comps:,} perbandingan [M3 - insertion sort] {dur_ms:.2f} ms")
+
+    def execute_merge_sort(self):
+        n_str = self.entry_sort_n.get().strip()
+        if not n_str.isdigit() or int(n_str) <= 0:
+            messagebox.showwarning("Peringatan", "Masukkan jumlah baris n yang valid!")
+            return
+
+        n = int(n_str)
+        key = self.combo_sort_key.get()
+
+        data_to_sort = self.master_list[:n]
+        res, comps, shifts, dur_ms, _ = merge_sort(data_to_sort, key)
+
+        self.sorted_list = ListWrapper(res)
+        if key == "oid" and n == len(self.master_list):
+            self.oid_sorted_list = res
+
+        self.current_view_mode = "SORTED"
+        self.current_page = 0
+        self.render_table()
+
+        time_str = f"{dur_ms / 1000:.2f} s" if dur_ms >= 1000 else f"{dur_ms:.2f} ms"
+        self.lbl_detail_selection.config(
+            text=f"Merge Sort: {n:,} pesanan terurut menurut '{key}' | {comps:,} perbandingan | {shifts:,} pemindahan | {time_str}"
+        )
+        self.log_command(f"> merge_sort jumlah={n:,} kunci={key}")
+        self.log_command(f"  {n:,} pesanan terurut | {comps:,} perbandingan [M3 - merge sort] {time_str}")
+
+    def execute_linear_search(self):
+        target = self.entry_search_target.get().strip()
+        if not target:
+            messagebox.showwarning("Peringatan", "Masukkan target OID!")
+            return
+
+        idx, comps, dur_ms = linear_search(self.master_list, target)
+
+        if idx != -1:
+            self.current_view_mode = "M1"
+            self.jump_to_index(idx)
+            item = self.master_list[idx]
+            self.lbl_detail_selection.config(
+                text=f"Linear Search: Ditemukan {item.oid} ({item.pelanggan}) di indeks {idx:,} | {comps:,} perbandingan | {dur_ms:.2f} ms"
+            )
+            self.log_command(f"> linear_search {target}")
+            self.log_command(f"  ditemukan di indeks {idx:,} | {comps:,} perbandingan [M3 - linear] {dur_ms:.2f} ms")
+        else:
+            self.log_command(f"> linear_search {target}")
+            self.log_command(f"  tidak ditemukan | {comps:,} perbandingan [M3 - linear] {dur_ms:.2f} ms")
+            messagebox.showinfo("Hasil", f"Pesanan {target} tidak ditemukan!")
+
+    def execute_binary_search(self):
+        target = self.entry_search_target.get().strip()
+        if not target:
+            messagebox.showwarning("Peringatan", "Masukkan target OID!")
+            return
+
+        built_now = False
+        if self.oid_sorted_list is None:
+            res, _, _, dur_build, _ = merge_sort(self.master_list, "oid")
+            self.oid_sorted_list = res
+            built_now = True
+
+        idx, comps, dur_ms = binary_search(self.oid_sorted_list, target)
+
+        self.sorted_list = ListWrapper(self.oid_sorted_list)
+        self.current_view_mode = "SORTED"
+
+        self.log_command(f"> binary_search {target}")
+        if built_now:
+            self.log_command(f"  daftar terurut oid dibangun sekali (merge sort) {dur_build:.2f} ms")
+
+        if idx != -1:
+            self.jump_to_index(idx)
+            item = self.oid_sorted_list[idx]
+            self.lbl_detail_selection.config(
+                text=f"Binary Search: Ditemukan {item.oid} ({item.pelanggan}) di baris {idx + 1:,} | {comps:,} perbandingan | {dur_ms:.2f} ms"
+            )
+            self.log_command(f"  ditemukan di baris {idx + 1:,} | {comps:,} perbandingan [M3 - binary] {dur_ms:.2f} ms")
+        else:
+            self.log_command(f"  tidak ditemukan | {comps:,} perbandingan [M3 - binary] {dur_ms:.2f} ms")
+            messagebox.showinfo("Hasil", f"Pesanan {target} tidak ditemukan!")
 
     def run(self):
         self.root.mainloop()
