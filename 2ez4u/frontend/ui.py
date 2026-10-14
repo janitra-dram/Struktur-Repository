@@ -6,10 +6,10 @@ import csv
 from backend.m1_pesanan import Array, LinkList, Pesanan
 from backend.m2_antrean import (
     Stack,
-    ke_postfix,
-    hitung_postfix,
-    AntreanNaif,
-    AntreanMelingkar
+    infix_to_postfix,
+    evaluate_postfix,
+    NaiveQueue,
+    CircularQueue
 )
 from backend.m3_laporan import (
     insertion_sort,
@@ -46,8 +46,8 @@ class AppUI:
         self.linked_list_data = LinkList()
         self.master_list = []
 
-        self.q_naif = AntreanNaif()
-        self.q_circ = AntreanMelingkar(32768)
+        self.q_naif = NaiveQueue()
+        self.q_circ = CircularQueue(32768)
         self.tumpukan_undo = Stack()
         self.tumpukan_redo = Stack()
 
@@ -532,8 +532,8 @@ class AppUI:
         try:
             arr = Array()
             ll = LinkList()
-            qn = AntreanNaif()
-            qc = AntreanMelingkar(32768)
+            qn = NaiveQueue()
+            qc = CircularQueue(32768)
             ml = []
 
             with open(self.csv_path, mode="r", encoding="utf-8") as f:
@@ -809,8 +809,8 @@ class AppUI:
             return
 
         t0 = time.perf_counter()
-        tokens, postfix_str, steps1 = ke_postfix(expr)
-        total, steps2 = hitung_postfix(tokens)
+        tokens, postfix_str, steps1 = infix_to_postfix(expr)
+        total, steps2 = evaluate_postfix(tokens)
         duration_ms = (time.perf_counter() - t0) * 1000
 
         for item in self.tree.get_children():
@@ -889,10 +889,10 @@ class AppUI:
             return
 
         t0 = time.perf_counter()
-        keluar, total_geseran = self.q_naif.dequeue_banyak(k)
+        keluar, total_geseran = self.q_naif.dequeue_batch(k)
         duration_ms = (time.perf_counter() - t0) * 1000
 
-        self.q_circ.dequeue_banyak(len(keluar))
+        self.q_circ.dequeue_batch(len(keluar))
 
         self.tumpukan_undo.push(("DEQUEUE", keluar))
         self.tumpukan_redo.clear()
@@ -917,10 +917,10 @@ class AppUI:
             return
 
         t0 = time.perf_counter()
-        keluar, _ = self.q_circ.dequeue_banyak(k)
+        keluar, _ = self.q_circ.dequeue_batch(k)
         duration_ms = (time.perf_counter() - t0) * 1000
 
-        self.q_naif.dequeue_banyak(len(keluar))
+        self.q_naif.dequeue_batch(len(keluar))
 
         self.tumpukan_undo.push(("DEQUEUE", keluar))
         self.tumpukan_redo.clear()
@@ -946,8 +946,8 @@ class AppUI:
 
         if tipe == "ENQUEUE":
             p = data
-            self.q_naif.keluarkan_dari_belakang()
-            self.q_circ.keluarkan_dari_belakang()
+            self.q_naif.pop_rear()
+            self.q_circ.pop_rear()
             self.tumpukan_redo.push(action)
             dur = (time.perf_counter() - t0) * 1000
 
@@ -961,8 +961,8 @@ class AppUI:
 
         elif tipe == "DEQUEUE":
             daftar = data
-            self.q_naif.kembalikan_ke_depan(daftar)
-            self.q_circ.kembalikan_ke_depan(daftar)
+            self.q_naif.push_front_batch(daftar)
+            self.q_circ.push_front_batch(daftar)
             self.tumpukan_redo.push(action)
             dur = (time.perf_counter() - t0) * 1000
 
@@ -1005,8 +1005,8 @@ class AppUI:
         elif tipe == "DEQUEUE":
             daftar = data
             k = len(daftar)
-            self.q_naif.dequeue_banyak(k)
-            self.q_circ.dequeue_banyak(k)
+            self.q_naif.dequeue_batch(k)
+            self.q_circ.dequeue_batch(k)
             self.tumpukan_undo.push(action)
             dur = (time.perf_counter() - t0) * 1000
 
