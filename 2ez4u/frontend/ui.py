@@ -156,20 +156,7 @@ class AppUI:
             btn.pack(fill=tk.X, padx=10, pady=2)
             self.sidebar_buttons[text] = btn
 
-        ttk.Separator(scrollable_frame, orient="horizontal").pack(fill=tk.X, padx=10, pady=8)
 
-        placeholders = [
-            ("M4 - PENCARIAN HASH", ["Bangun indeks hash", "Cari pesanan (hash)"]),
-            ("M5 - KATALOG & PRIORITAS", ["Menu per rentang harga", "Isi antrean prioritas"]),
-            ("M6 - PETA DAN RUTE", ["Muat peta", "Cari rute terpendek"])
-        ]
-
-        for section_title, submenus in placeholders:
-            tk.Label(scrollable_frame, text=section_title, font=("Arial", 8, "bold"), fg="#888888", bg="#f0f0f0", anchor="w").pack(fill=tk.X, padx=10, pady=(6, 2))
-            for sub in submenus:
-                btn_ph = tk.Button(scrollable_frame, text=sub, font=("Arial", 8), bg="#f8f8f8", fg="#999999",
-                                   anchor="w", padx=6, pady=1, state=tk.DISABLED)
-                btn_ph.pack(fill=tk.X, padx=10, pady=1)
 
         right_container = tk.Frame(main_container, bg="#ffffff")
         right_container.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
