@@ -78,18 +78,38 @@ class AppUI:
         sidebar_frame.pack_propagate(False)
 
         canvas = tk.Canvas(sidebar_frame, bg="#f0f0f0", highlightthickness=0)
-        scrollbar = tk.Scrollbar(sidebar_frame, orient="vertical", command=canvas.yview)
+        scrollbar = ttk.Scrollbar(sidebar_frame, orient="vertical", command=canvas.yview)
         scrollable_frame = tk.Frame(canvas, bg="#f0f0f0")
 
         scrollable_frame.bind(
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw", width=230)
+        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+
+        def _on_canvas_configure(e):
+            canvas.itemconfig(canvas_window, width=e.width)
+
+        canvas.bind("<Configure>", _on_canvas_configure)
         canvas.configure(yscrollcommand=scrollbar.set)
 
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        def _on_mousewheel(event):
+            try:
+                x, y = self.root.winfo_pointerxy()
+                widget = self.root.winfo_containing(x, y)
+                curr = widget
+                while curr:
+                    if curr == sidebar_frame:
+                        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+                        break
+                    curr = curr.master
+            except Exception:
+                pass
+
+        self.root.bind_all("<MouseWheel>", _on_mousewheel)
 
         tk.Label(scrollable_frame, text="DATA", font=("Arial", 10, "bold"), bg="#f0f0f0", anchor="w").pack(fill=tk.X, padx=10, pady=(8, 2))
         btn_load = tk.Button(scrollable_frame, text="Load Data CSV", bg="#e1e1e1", activebackground="#d0d0d0",
@@ -156,7 +176,7 @@ class AppUI:
             btn.pack(fill=tk.X, padx=10, pady=2)
             self.sidebar_buttons[text] = btn
 
-
+        tk.Frame(scrollable_frame, height=20, bg="#f0f0f0").pack(fill=tk.X)
 
         right_container = tk.Frame(main_container, bg="#ffffff")
         right_container.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
@@ -228,19 +248,27 @@ class AppUI:
         self.lbl_detail_selection = tk.Label(right_container, text="", font=("Arial", 9, "italic"), fg="#333333", bg="#ffffff", anchor="w")
         self.lbl_detail_selection.pack(fill=tk.X, padx=12, pady=(2, 2))
 
-        bottom_frame = tk.Frame(self.root, height=130, bg="#1e1e1e", padx=10, pady=6)
+        bottom_frame = tk.Frame(self.root, bg="#1e1e1e", padx=8, pady=4)
         bottom_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
         header_log = tk.Frame(bottom_frame, bg="#1e1e1e")
-        header_log.pack(fill=tk.X)
-        tk.Label(header_log, text="COMMAND", font=("Consolas", 10, "bold"), fg="#ffffff", bg="#1e1e1e").pack(side=tk.LEFT)
+        header_log.pack(fill=tk.X, pady=(0, 2))
+        tk.Label(header_log, text="COMMAND", font=("Consolas", 9, "bold"), fg="#ffffff", bg="#1e1e1e").pack(side=tk.LEFT)
         btn_clear_log = tk.Button(header_log, text="Clear Log", font=("Consolas", 8), bg="#333333", fg="#ffffff",
-                                  relief=tk.FLAT, command=self.clear_log)
+                                  relief=tk.FLAT, command=self.clear_log, padx=4, pady=0)
         btn_clear_log.pack(side=tk.RIGHT)
 
-        self.log_text = tk.Text(bottom_frame, height=5, bg="#121212", fg="#00ff66",
-                                font=("Consolas", 9), insertbackground="white", relief=tk.SUNKEN)
-        self.log_text.pack(fill=tk.BOTH, expand=True, pady=(4, 0))
+        log_container = tk.Frame(bottom_frame, bg="#1e1e1e")
+        log_container.pack(fill=tk.BOTH, expand=True)
+
+        log_scroll = ttk.Scrollbar(log_container, orient=tk.VERTICAL)
+        log_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.log_text = tk.Text(log_container, height=3, bg="#121212", fg="#00ff66",
+                                font=("Consolas", 9), insertbackground="white", relief=tk.SUNKEN,
+                                yscrollcommand=log_scroll.set)
+        self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        log_scroll.config(command=self.log_text.yview)
 
     def build_form_inputs(self):
         for widget in self.form_frame.winfo_children():
